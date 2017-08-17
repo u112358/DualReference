@@ -12,8 +12,11 @@ class DualReferenceFR(object):
     def __init__(self):
 
         # data directories
-        self.data_dir = '/home/bingzhang/Documents/Dataset/CACD/CACD2000'
-        self.data_info = '/home/bingzhang/Documents/Dataset/CACD/celenew.mat'
+        # self.data_dir = '/home/bingzhang/Documents/Dataset/CACD/CACD2000'
+        # self.data_info = '/home/bingzhang/Documents/Dataset/CACD/celenew.mat'
+
+        self.data_dir = '/scratch/BingZhang/dataset/CACD2000'
+        self.data_info = '/scratch/BingZhang/dataset/CACD2000/celenew.mat'
         # image size
         self.image_height = 250
         self.image_width = 250
@@ -27,7 +30,7 @@ class DualReferenceFR(object):
         self.max_epoch = 10000
         self.delta = 0.2
         self.nof_sampled_id = 45
-        self.nof_images_per_id = 10
+        self.nof_images_per_id = 20
         self.sampled_examples = self.nof_images_per_id * self.nof_sampled_id
         # placeholder
         self.path_placeholder = tf.placeholder(tf.string, [None, 3], name='paths')
@@ -99,6 +102,10 @@ class DualReferenceFR(object):
         pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
         neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
 
+        with tf.name_scope('Distances'):
+            tf.summary.histogram('positive',pos_dist)
+            tf.summary.histogram('negative',neg_dist)
+
         basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
         loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
         return loss
@@ -135,7 +142,7 @@ class DualReferenceFR(object):
 
     def train(self):
         CACD = FileReader(self.data_dir, self.data_info, reproducible=True, contain_val=False)
-        summaryWriter = tf.summary.FileWriter(os.path.join('./log/', datetime.now().isoformat()), self.sess.graph)
+        summaryWriter = tf.summary.FileWriter(os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), self.sess.graph)
 
         for triplet_selection in range(self.max_epoch):
             # select some examples to forward propagation
@@ -179,7 +186,7 @@ class DualReferenceFR(object):
             nof_batches = int(np.ceil(nof_triplets*3 / self.batch_size))
             for i in range(nof_batches):
                 batch_size = min(nof_triplets*3 - i * self.batch_size, self.batch_size)
-                sum, loss, label_watch, _ = self.sess.run([self.summary_op,self.id_loss, self.label_batch,self.id_opt],
+                sum, loss, label_watch,emb, _ = self.sess.run([self.summary_op,self.id_loss, self.label_batch,self.id_embedding,self.id_opt],
                                              feed_dict={self.batch_size_placeholder: batch_size,
                                                         self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
                                                                                               self.sampled_examples,
