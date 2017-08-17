@@ -27,4 +27,4 @@ def progress(count, total, prefix='',suffix=''):
     percents = round(100.0 * count / float(total), 1)
     bar = '=' * filled_len +'>'+'-' * (bar_len - filled_len-1)
 
-    print ('%s [%s] %d/%d%s\r' % (prefix,bar, count, total, suffix))
+    print ('%s [%s] %d/%d %s\r' % (prefix,bar, count, total, suffix))

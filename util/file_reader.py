@@ -96,7 +96,7 @@ class FileReader():
                 except:
                     paths.append(os.path.join(self.prefix,self.path[image][0]))
                 labels.append(i)
-        return paths,labels
+        return np.asarray(paths),np.asarray(labels)
 
     def select_identity(self, nof_person, nof_images):
         images_and_labels = []

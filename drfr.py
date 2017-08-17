@@ -26,18 +26,18 @@ class DualReferenceFR(object):
         self.embedding_size = 128
         self.max_epoch = 10000
         self.delta = 0.2
-        self.nof_sampled_id = 40
+        self.nof_sampled_id = 45
         self.nof_images_per_id = 10
         self.sampled_examples = self.nof_images_per_id * self.nof_sampled_id
         # placeholder
-        self.path_placeholder = tf.placeholder(tf.string, [None, 1], name='paths')
-        self.label_placeholder = tf.placeholder(tf.int64, [None, 1], name='labels')
+        self.path_placeholder = tf.placeholder(tf.string, [None, 3], name='paths')
+        self.label_placeholder = tf.placeholder(tf.int64, [None, 3], name='labels')
         self.batch_size_placeholder = tf.placeholder(tf.int32, name='batch_size')
         self.affinity_watch = tf.placeholder(tf.float32, [None, self.sampled_examples, self.sampled_examples, 1])
         self.affinity_watch_binarized = tf.placeholder(tf.float32,
                                                        [None, self.sampled_examples, self.sampled_examples, 1])
         # ops
-        self.input_queue = data_flow_ops.FIFOQueue(capacity=1000000, dtypes=[tf.string, tf.int64], shapes=[(1,), (1,)])
+        self.input_queue = data_flow_ops.FIFOQueue(capacity=1000000, dtypes=[tf.string, tf.int64], shapes=[(3,), (3,)])
         self.enqueue_op = self.input_queue.enqueue_many([self.path_placeholder, self.label_placeholder])
 
         nof_process_threads = 4
@@ -63,7 +63,7 @@ class DualReferenceFR(object):
         self.embedding = self.net_forward(self.image_batch)
         self.id_embedding = self.get_id_embeddings(self.embedding)
         self.id_loss = self.get_triplet_loss(self.id_embedding)
-        self.id_opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9).minimize(self.id_loss)
+        self.id_opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9,use_nesterov=True).minimize(self.id_loss)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
@@ -109,6 +109,7 @@ class DualReferenceFR(object):
             tf.summary.image('binarized', self.affinity_watch_binarized)
         with tf.name_scope('Loss'):
             tf.summary.scalar('id_loss', self.id_loss)
+        tf.summary.histogram('Embeddings',self.id_embedding)
         return tf.summary.merge_all()
 
     # def test_module(self):
@@ -138,10 +139,10 @@ class DualReferenceFR(object):
 
         for triplet_selection in range(self.max_epoch):
             # select some examples to forward propagation
-            path_array, label_array = CACD.select_identity_path(self.nof_sampled_id, self.nof_images_per_id)
+            paths, labels = CACD.select_identity_path(self.nof_sampled_id, self.nof_images_per_id)
             nof_examples = self.nof_sampled_id * self.nof_images_per_id
-            path_array = np.reshape(path_array, (-1, 1))
-            label_array = np.reshape(np.arange(nof_examples), (-1, 1))
+            path_array = np.reshape(paths, (-1, 3))
+            label_array = np.reshape(np.arange(nof_examples), (-1, 3))
             embeddings_array = np.zeros(shape=(nof_examples, self.embedding_size))
 
             # FIFO enqueue
@@ -156,6 +157,7 @@ class DualReferenceFR(object):
                 emb, label = self.sess.run([self.id_embedding, self.label_batch],
                                            feed_dict={self.batch_size_placeholder: batch_size})
                 embeddings_array[label, :] = emb
+                pass
 
             # compute affinity matrix
             aff = []
@@ -165,21 +167,19 @@ class DualReferenceFR(object):
 
             # select triplets to train
             triplet = select_triplets(embeddings_array, self.nof_sampled_id, self.nof_images_per_id, self.delta)
-            triplet_path_array = path_array[triplet][:]
-            triplet_label_array = label_array[triplet][:]
-            triplet_path_array = np.reshape(triplet_path_array, (-1, 1))
-            triplet_label_array = np.reshape(triplet_label_array, (-1, 1))
+            triplet_path_array = paths[triplet][:]
+            triplet_label_array = labels[triplet][:]
             nof_triplets = len(triplet_path_array)
-            print('%d triplets selected' % int(nof_triplets / 3))
+            print('%d triplets selected' % nof_triplets)
 
             # FIFO enqueue
             self.sess.run(self.enqueue_op, feed_dict={self.path_placeholder: triplet_path_array,
                                                       self.label_placeholder: triplet_label_array})
             # train on selected triplets
-            nof_batches = int(np.ceil(nof_triplets / self.batch_size))
+            nof_batches = int(np.ceil(nof_triplets*3 / self.batch_size))
             for i in range(nof_batches):
-                batch_size = min(nof_triplets - i * self.batch_size, self.batch_size)
-                sum, loss, _ = self.sess.run([self.summary_op,self.id_loss, self.id_opt],
+                batch_size = min(nof_triplets*3 - i * self.batch_size, self.batch_size)
+                sum, loss, label_watch, _ = self.sess.run([self.summary_op,self.id_loss, self.label_batch,self.id_opt],
                                              feed_dict={self.batch_size_placeholder: batch_size,
                                                         self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
                                                                                               self.sampled_examples,
@@ -188,8 +188,8 @@ class DualReferenceFR(object):
                                                                                                                   self.sampled_examples,
                                                                                                                   self.sampled_examples,
                                                                                                                   1])})
-                progress(i + 1, nof_batches, str(triplet_selection) + 'th epoch',
-                         'batches loss:' + str(loss))  # a command progress bar to watch training progress
+                progress(i + 1, nof_batches, str(triplet_selection) + 'th Epoch',
+                         'Batches loss:' + str(loss))  # a command progress bar to watch training progress
                 self.step += 1
                 summaryWriter.add_summary(sum, self.step)
 
