@@ -1,7 +1,6 @@
 from __future__ import division
 
-import tensorflow as tf
-from util.net_builder import *
+from util.net import *
 from tensorflow.python.ops import data_flow_ops
 from util.file_reader import *
 from util.progress import *
@@ -10,13 +9,17 @@ from datetime import datetime
 
 class DualReferenceFR(object):
     def __init__(self):
-
         # data directories
         # self.data_dir = '/home/bingzhang/Documents/Dataset/CACD/CACD2000'
         # self.data_info = '/home/bingzhang/Documents/Dataset/CACD/celenew.mat'
+        # self.val_dir = '/home/bingzhang/Documents/Dataset/ZID/LFW/lfw'
 
         self.data_dir = '/scratch/BingZhang/dataset/CACD2000'
         self.data_info = '/scratch/BingZhang/dataset/CACD2000/celenew.mat'
+        self.val_dir = '/scratch/BingZhang/lfw/'
+        self.val_list = './data/val_list.txt'
+        # model directory
+        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQ-Model'
         # image size
         self.image_height = 250
         self.image_width = 250
@@ -32,6 +35,7 @@ class DualReferenceFR(object):
         self.nof_sampled_id = 45
         self.nof_images_per_id = 20
         self.sampled_examples = self.nof_images_per_id * self.nof_sampled_id
+        self.val_size = 144
         # placeholder
         self.path_placeholder = tf.placeholder(tf.string, [None, 3], name='paths')
         self.label_placeholder = tf.placeholder(tf.int64, [None, 3], name='labels')
@@ -39,6 +43,8 @@ class DualReferenceFR(object):
         self.affinity_watch = tf.placeholder(tf.float32, [None, self.sampled_examples, self.sampled_examples, 1])
         self.affinity_watch_binarized = tf.placeholder(tf.float32,
                                                        [None, self.sampled_examples, self.sampled_examples, 1])
+        self.affinity_on_val = tf.placeholder(tf.float32, [None, self.val_size, self.val_size, 1])
+        self.nof_triplets_placeholder = tf.placeholder(tf.int16, name='nof_triplets')
         # ops
         self.input_queue = data_flow_ops.FIFOQueue(capacity=1000000, dtypes=[tf.string, tf.int64], shapes=[(3,), (3,)])
         self.enqueue_op = self.input_queue.enqueue_many([self.path_placeholder, self.label_placeholder])
@@ -66,7 +72,9 @@ class DualReferenceFR(object):
         self.embedding = self.net_forward(self.image_batch)
         self.id_embedding = self.get_id_embeddings(self.embedding)
         self.id_loss = self.get_triplet_loss(self.id_embedding)
-        self.id_opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9,use_nesterov=True).minimize(self.id_loss)
+        self.total_loss = tf.add_n([self.id_loss], tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+        self.id_opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9,
+                                                 use_nesterov=True).minimize(self.id_loss)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
@@ -86,7 +94,7 @@ class DualReferenceFR(object):
         with tf.variable_scope('id_embedding'):
             id_embeddings = slim.fully_connected(feature, self.embedding_size, activation_fn=None,
                                                  weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
-                                                 weights_regularizer=slim.l2_regularizer(0.01), scope='id_embedding')
+                                                 weights_regularizer=slim.l2_regularizer(0.0), scope='id_embedding')
             weights = slim.get_model_variables('id_embedding')[0]
             bias = slim.get_model_variables('id_embedding')[1]
             variable_summaries(weights, 'weight')
@@ -95,28 +103,34 @@ class DualReferenceFR(object):
         return id_embeddings
 
     def get_triplet_loss(self, embeddings):
-        anchor = embeddings[0:self.batch_size:3][:]
-        positive = embeddings[1:self.batch_size:3][:]
-        negative = embeddings[2:self.batch_size:3][:]
+        with tf.variable_scope('triplet_loss'):
+            anchor = embeddings[0:self.batch_size:3][:]
+            positive = embeddings[1:self.batch_size:3][:]
+            negative = embeddings[2:self.batch_size:3][:]
 
-        pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
-        neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+            pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
+            neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
 
-        with tf.name_scope('Distances'):
-            tf.summary.histogram('positive',pos_dist)
-            tf.summary.histogram('negative',neg_dist)
+            with tf.name_scope('Distances'):
+                tf.summary.histogram('positive', pos_dist)
+                tf.summary.histogram('negative', neg_dist)
 
-        basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
-        loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+            basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
+            loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
         return loss
 
     def build_summary(self):
-        with tf.name_scope('Affinity'):
+        with tf.name_scope('affinity'):
             tf.summary.image('original', self.affinity_watch)
             tf.summary.image('binarized', self.affinity_watch_binarized)
-        with tf.name_scope('Loss'):
+            tf.summary.image('val', self.affinity_on_val)
+        with tf.name_scope('loss'):
             tf.summary.scalar('id_loss', self.id_loss)
-        tf.summary.histogram('Embeddings',self.id_embedding)
+            average = tf.train.ExponentialMovingAverage(0.9)
+            self.average_op = average.apply([self.total_loss])
+            tf.summary.scalar('id_loss_average', average.average(self.total_loss))
+        tf.summary.histogram('embeddings', self.id_embedding)
+        tf.summary.scalar('nof_triplet', self.nof_triplets_placeholder)
         return tf.summary.merge_all()
 
     # def test_module(self):
@@ -139,11 +153,11 @@ class DualReferenceFR(object):
     #         print('after dequeue, size is %d' %self.sess.run(self.input_queue.size()))
     #         self.summary_writer.add_summary(sum, step)
 
-
     def train(self):
         CACD = FileReader(self.data_dir, self.data_info, reproducible=True, contain_val=False)
-        summaryWriter = tf.summary.FileWriter(os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), self.sess.graph)
-
+        summary_writer = tf.summary.FileWriter(
+            os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), self.sess.graph)
+        saver = tf.train.Saver()
         for triplet_selection in range(self.max_epoch):
             # select some examples to forward propagation
             paths, labels = CACD.select_identity_path(self.nof_sampled_id, self.nof_images_per_id)
@@ -164,13 +178,14 @@ class DualReferenceFR(object):
                 emb, label = self.sess.run([self.id_embedding, self.label_batch],
                                            feed_dict={self.batch_size_placeholder: batch_size})
                 embeddings_array[label, :] = emb
-                pass
 
-            # compute affinity matrix
+            # compute affinity matrix on batch
             aff = []
             for index in range(nof_examples):
                 aff.append(np.sum(np.square(embeddings_array[index][:] - embeddings_array), 1))
             aff_binarized = binarize_affinity(aff, self.nof_images_per_id)
+            # affinity matrix on
+            aff_val = np.zeros((self.val_size, self.val_size))
 
             # select triplets to train
             triplet = select_triplets(embeddings_array, self.nof_sampled_id, self.nof_images_per_id, self.delta)
@@ -183,22 +198,54 @@ class DualReferenceFR(object):
             self.sess.run(self.enqueue_op, feed_dict={self.path_placeholder: triplet_path_array,
                                                       self.label_placeholder: triplet_label_array})
             # train on selected triplets
-            nof_batches = int(np.ceil(nof_triplets*3 / self.batch_size))
+            nof_batches = int(np.ceil(nof_triplets * 3 / self.batch_size))
             for i in range(nof_batches):
-                batch_size = min(nof_triplets*3 - i * self.batch_size, self.batch_size)
-                sum, loss, label_watch,emb, _ = self.sess.run([self.summary_op,self.id_loss, self.label_batch,self.id_embedding,self.id_opt],
-                                             feed_dict={self.batch_size_placeholder: batch_size,
-                                                        self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
-                                                                                              self.sampled_examples,
-                                                                                              1]),
-                                                        self.affinity_watch_binarized: np.reshape(aff_binarized, [1,
-                                                                                                                  self.sampled_examples,
-                                                                                                                  self.sampled_examples,
-                                                                                                                  1])})
+                batch_size = min(nof_triplets * 3 - i * self.batch_size, self.batch_size)
+                _sum, loss, _ = self.sess.run(
+                    [self.summary_op, self.id_loss, self.id_opt],
+                    feed_dict={self.batch_size_placeholder: batch_size,
+                               self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
+                                                                     self.sampled_examples,
+                                                                     1]),
+                               self.affinity_watch_binarized: np.reshape(aff_binarized, [1,
+                                                                                         self.sampled_examples,
+                                                                                         self.sampled_examples,
+                                                                                         1]),
+                               self.nof_triplets_placeholder: nof_triplets,
+                               self.affinity_on_val: np.reshape(aff_val, [1, self.val_size, self.val_size, 1])})
                 progress(i + 1, nof_batches, str(triplet_selection) + 'th Epoch',
                          'Batches loss:' + str(loss))  # a command progress bar to watch training progress
                 self.step += 1
-                summaryWriter.add_summary(sum, self.step)
+                # save model
+                if self.step % 5000 == 0:
+                    saver.save(self.sess, self.model_dir, global_step=self.step)
+
+                # write in summary
+                summary_writer.add_summary(_sum, self.step)
+
+            # perform a validation on lfw
+            if triplet_selection % 100 == 0:
+                val_paths = CACD.get_val(self.val_size)
+                val_path_array = np.reshape(val_paths, (-1, 3))
+                val_label_array = np.reshape(np.arange(self.val_size), (-1, 3))
+                val_embeddings_array = np.zeros(shape=(self.val_size, self.embedding_size))
+
+                # FIFO enqueue
+                self.sess.run(self.enqueue_op,
+                              feed_dict={self.path_placeholder: val_path_array,
+                                         self.label_placeholder: val_label_array})
+
+                # forward propagation to get val embeddings
+                print('Forward propagation to get current embeddings\n')
+                nof_batches = int(np.ceil(self.val_size / self.batch_size))
+                for i in range(nof_batches):
+                    batch_size = min(self.val_size - i * self.batch_size, self.batch_size)
+                    emb, label = self.sess.run([self.id_embedding, self.label_batch],
+                                               feed_dict={self.batch_size_placeholder: batch_size})
+                    val_embeddings_array[label, :] = emb
+                aff_val = []
+                for index in range(self.val_size):
+                    aff_val.append(np.sum(np.square(val_embeddings_array[index][:] - val_embeddings_array), 1))
 
 
 def binarize_affinity(aff, k):
