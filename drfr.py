@@ -154,7 +154,8 @@ class DualReferenceFR(object):
         coord = tf.train.Coordinator()
         tf.train.start_queue_runners(coord=coord, sess=sess)
 
-        CACD = FileReader(self.data_dir, self.data_info, val_data_dir=self.val_dir,val_list=self.val_list,reproducible=True, contain_val=True)
+        CACD = FileReader(self.data_dir, self.data_info, val_data_dir=self.val_dir, val_list=self.val_list,
+                          reproducible=True, contain_val=True)
         summary_writer = tf.summary.FileWriter(
             os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), sess.graph)
         saver = tf.train.Saver()
@@ -201,30 +202,33 @@ class DualReferenceFR(object):
             nof_batches = int(np.ceil(nof_triplets * 3 / self.batch_size))
             for i in range(nof_batches):
                 batch_size = min(nof_triplets * 3 - i * self.batch_size, self.batch_size)
-                _sum, loss, _ = sess.run(
-                    [self.summary_op, self.id_loss, self.id_opt],
-                    feed_dict={self.batch_size_placeholder: batch_size,
-                               self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
-                                                                     self.sampled_examples,
-                                                                     1]),
-                               self.affinity_watch_binarized: np.reshape(aff_binarized, [1,
-                                                                                         self.sampled_examples,
-                                                                                         self.sampled_examples,
-                                                                                         1]),
-                               self.nof_triplets_placeholder: nof_triplets,
-                               self.affinity_on_val: np.reshape(aff_val, [1, self.val_size, self.val_size, 1])})
+                if self.step % 200 == 0:
+                    _sum, loss, _ = sess.run(
+                        [self.summary_op, self.id_loss, self.id_opt],
+                        feed_dict={self.batch_size_placeholder: batch_size,
+                                   self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
+                                                                         self.sampled_examples,
+                                                                         1]),
+                                   self.affinity_watch_binarized: np.reshape(aff_binarized, [1,
+                                                                                             self.sampled_examples,
+                                                                                             self.sampled_examples,
+                                                                                             1]),
+                                   self.nof_triplets_placeholder: nof_triplets,
+                                   self.affinity_on_val: np.reshape(aff_val, [1, self.val_size, self.val_size, 1])})
+
+                    # write in summary
+                    summary_writer.add_summary(_sum, self.step)
+                else:
+                    loss, _ = sess.run([self.id_loss, self.id_opt], feed_dict={self.batch_size_placeholder: batch_size})
                 progress(i + 1, nof_batches, str(triplet_selection) + 'th Epoch',
                          'Batches loss:' + str(loss))  # a command progress bar to watch training progress
                 self.step += 1
                 # save model
-                if self.step % 5000 == 0:
+                if self.step % 200000 == 0:
                     saver.save(sess, self.model_dir, global_step=self.step)
 
-                # write in summary
-                summary_writer.add_summary(_sum, self.step)
-
             # perform a validation on lfw
-            if triplet_selection % 100 == 0:
+            if triplet_selection % 10 == 0:
                 val_paths = CACD.get_val(self.val_size)
                 val_path_array = np.reshape(val_paths, (-1, 3))
                 val_label_array = np.reshape(np.arange(self.val_size), (-1, 3))
