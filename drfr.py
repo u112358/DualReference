@@ -73,14 +73,10 @@ class DualReferenceFR(object):
         self.id_embedding = self.get_id_embeddings(self.embedding)
         self.id_loss = self.get_triplet_loss(self.id_embedding)
         self.total_loss = tf.add_n([self.id_loss], tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-        self.id_opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9,
-                                                 use_nesterov=True).minimize(self.id_loss)
-
-        self.sess = tf.Session()
-        self.sess.run(tf.global_variables_initializer())
-        self.coord = tf.train.Coordinator()
-        tf.train.start_queue_runners(coord=self.coord, sess=self.sess)
-        self.summary_op = self.build_summary()
+        self.summary_op, self.average_op = self.build_summary()
+        with tf.control_dependencies([self.average_op]):
+            self.id_opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9,
+                                                     use_nesterov=True).minimize(self.id_loss)
 
     def net_forward(self, image_batch):
         net, _ = inference(image_batch, keep_probability=1.0, bottleneck_layer_size=128, phase_train=True,
@@ -127,11 +123,11 @@ class DualReferenceFR(object):
         with tf.name_scope('loss'):
             tf.summary.scalar('id_loss', self.id_loss)
             average = tf.train.ExponentialMovingAverage(0.9)
-            self.average_op = average.apply([self.total_loss])
+            average_op = average.apply([self.total_loss])
             tf.summary.scalar('id_loss_average', average.average(self.total_loss))
         tf.summary.histogram('embeddings', self.id_embedding)
         tf.summary.scalar('nof_triplet', self.nof_triplets_placeholder)
-        return tf.summary.merge_all()
+        return tf.summary.merge_all(), average_op
 
     # def test_module(self):
     #     CACD = FileReader(self.data_dir,self.data_info,reproducible=True,contain_val=False)
@@ -154,9 +150,14 @@ class DualReferenceFR(object):
     #         self.summary_writer.add_summary(sum, step)
 
     def train(self):
+        sess = tf.Session()
+        sess.run(tf.global_variables_initializer())
+        coord = tf.train.Coordinator()
+        tf.train.start_queue_runners(coord=coord, sess=sess)
+
         CACD = FileReader(self.data_dir, self.data_info, reproducible=True, contain_val=False)
         summary_writer = tf.summary.FileWriter(
-            os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), self.sess.graph)
+            os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), sess.graph)
         saver = tf.train.Saver()
         for triplet_selection in range(self.max_epoch):
             # select some examples to forward propagation
@@ -167,16 +168,16 @@ class DualReferenceFR(object):
             embeddings_array = np.zeros(shape=(nof_examples, self.embedding_size))
 
             # FIFO enqueue
-            self.sess.run(self.enqueue_op,
-                          feed_dict={self.path_placeholder: path_array, self.label_placeholder: label_array})
+            sess.run(self.enqueue_op,
+                     feed_dict={self.path_placeholder: path_array, self.label_placeholder: label_array})
 
             # forward propagation to get current embeddings
             print('Forward propagation to get current embeddings\n')
             nof_batches = int(np.ceil(nof_examples / self.batch_size))
             for i in range(nof_batches):
                 batch_size = min(nof_examples - i * self.batch_size, self.batch_size)
-                emb, label = self.sess.run([self.id_embedding, self.label_batch],
-                                           feed_dict={self.batch_size_placeholder: batch_size})
+                emb, label = sess.run([self.id_embedding, self.label_batch],
+                                      feed_dict={self.batch_size_placeholder: batch_size})
                 embeddings_array[label, :] = emb
 
             # compute affinity matrix on batch
@@ -195,13 +196,13 @@ class DualReferenceFR(object):
             print('%d triplets selected' % nof_triplets)
 
             # FIFO enqueue
-            self.sess.run(self.enqueue_op, feed_dict={self.path_placeholder: triplet_path_array,
-                                                      self.label_placeholder: triplet_label_array})
+            sess.run(self.enqueue_op, feed_dict={self.path_placeholder: triplet_path_array,
+                                                 self.label_placeholder: triplet_label_array})
             # train on selected triplets
             nof_batches = int(np.ceil(nof_triplets * 3 / self.batch_size))
             for i in range(nof_batches):
                 batch_size = min(nof_triplets * 3 - i * self.batch_size, self.batch_size)
-                _sum, loss, _ = self.sess.run(
+                _sum, loss, _ = sess.run(
                     [self.summary_op, self.id_loss, self.id_opt],
                     feed_dict={self.batch_size_placeholder: batch_size,
                                self.affinity_watch: np.reshape(aff, [1, self.sampled_examples,
@@ -218,7 +219,7 @@ class DualReferenceFR(object):
                 self.step += 1
                 # save model
                 if self.step % 5000 == 0:
-                    saver.save(self.sess, self.model_dir, global_step=self.step)
+                    saver.save(sess, self.model_dir, global_step=self.step)
 
                 # write in summary
                 summary_writer.add_summary(_sum, self.step)
@@ -231,17 +232,17 @@ class DualReferenceFR(object):
                 val_embeddings_array = np.zeros(shape=(self.val_size, self.embedding_size))
 
                 # FIFO enqueue
-                self.sess.run(self.enqueue_op,
-                              feed_dict={self.path_placeholder: val_path_array,
-                                         self.label_placeholder: val_label_array})
+                sess.run(self.enqueue_op,
+                         feed_dict={self.path_placeholder: val_path_array,
+                                    self.label_placeholder: val_label_array})
 
                 # forward propagation to get val embeddings
                 print('Forward propagation to get current embeddings\n')
                 nof_batches = int(np.ceil(self.val_size / self.batch_size))
                 for i in range(nof_batches):
                     batch_size = min(self.val_size - i * self.batch_size, self.batch_size)
-                    emb, label = self.sess.run([self.id_embedding, self.label_batch],
-                                               feed_dict={self.batch_size_placeholder: batch_size})
+                    emb, label = sess.run([self.id_embedding, self.label_batch],
+                                          feed_dict={self.batch_size_placeholder: batch_size})
                     val_embeddings_array[label, :] = emb
                 aff_val = []
                 for index in range(self.val_size):
