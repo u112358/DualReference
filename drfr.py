@@ -99,20 +99,19 @@ class DualReferenceFR(object):
         return id_embeddings
 
     def get_triplet_loss(self, embeddings):
-        with tf.variable_scope('triplet_loss'):
-            anchor = embeddings[0:self.batch_size:3][:]
-            positive = embeddings[1:self.batch_size:3][:]
-            negative = embeddings[2:self.batch_size:3][:]
+        anchor = embeddings[0:self.batch_size:3][:]
+        positive = embeddings[1:self.batch_size:3][:]
+        negative = embeddings[2:self.batch_size:3][:]
 
-            pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
-            neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+        pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
+        neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
 
-            with tf.name_scope('Distances'):
-                tf.summary.histogram('positive', pos_dist)
-                tf.summary.histogram('negative', neg_dist)
+        with tf.name_scope('Distances'):
+            tf.summary.histogram('positive', pos_dist)
+            tf.summary.histogram('negative', neg_dist)
 
-            basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
-            loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+        basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
+        loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
         return loss
 
     def build_summary(self):
@@ -155,7 +154,7 @@ class DualReferenceFR(object):
         coord = tf.train.Coordinator()
         tf.train.start_queue_runners(coord=coord, sess=sess)
 
-        CACD = FileReader(self.data_dir, self.data_info, reproducible=True, contain_val=True)
+        CACD = FileReader(self.data_dir, self.data_info, val_data_dir=self.val_dir,val_list=self.val_list,reproducible=True, contain_val=True)
         summary_writer = tf.summary.FileWriter(
             os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), sess.graph)
         saver = tf.train.Saver()
