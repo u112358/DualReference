@@ -155,7 +155,7 @@ class DualReferenceFR(object):
         coord = tf.train.Coordinator()
         tf.train.start_queue_runners(coord=coord, sess=sess)
 
-        CACD = FileReader(self.data_dir, self.data_info, reproducible=True, contain_val=False)
+        CACD = FileReader(self.data_dir, self.data_info, reproducible=True, contain_val=True)
         summary_writer = tf.summary.FileWriter(
             os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), sess.graph)
         saver = tf.train.Saver()
