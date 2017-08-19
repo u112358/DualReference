@@ -106,7 +106,7 @@ class DualReferenceFR(object):
         pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
         neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
 
-        with tf.name_scope('Distances'):
+        with tf.name_scope('distances'):
             tf.summary.histogram('positive', pos_dist)
             tf.summary.histogram('negative', neg_dist)
 
@@ -159,6 +159,7 @@ class DualReferenceFR(object):
         summary_writer = tf.summary.FileWriter(
             os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), sess.graph)
         saver = tf.train.Saver()
+        aff_val = np.zeros((self.val_size,self.val_size))
         for triplet_selection in range(self.max_epoch):
             # select some examples to forward propagation
             paths, labels = CACD.select_identity_path(self.nof_sampled_id, self.nof_images_per_id)
@@ -186,7 +187,6 @@ class DualReferenceFR(object):
                 aff.append(np.sum(np.square(embeddings_array[index][:] - embeddings_array), 1))
             aff_binarized = binarize_affinity(aff, self.nof_images_per_id)
             # affinity matrix on
-            aff_val = np.zeros((self.val_size, self.val_size))
 
             # select triplets to train
             triplet = select_triplets(embeddings_array, self.nof_sampled_id, self.nof_images_per_id, self.delta)
@@ -228,7 +228,7 @@ class DualReferenceFR(object):
                     saver.save(sess, self.model_dir, global_step=self.step)
 
             # perform a validation on lfw
-            if triplet_selection % 10 == 0:
+            if triplet_selection % 5 == 0:
                 val_paths = CACD.get_val(self.val_size)
                 val_path_array = np.reshape(val_paths, (-1, 3))
                 val_label_array = np.reshape(np.arange(self.val_size), (-1, 3))
