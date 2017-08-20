@@ -26,8 +26,8 @@ class DualReferenceFR(object):
         self.image_channel = 3
         # net parameters
         self.step = 0
-        self.learning_rate = 0.01
-        self.batch_size = 21  # must be a multiple of 3
+        self.learning_rate = 0.1
+        self.batch_size = 30  # must be a multiple of 3
         self.feature_dim = 1024
         self.embedding_size = 128
         self.max_epoch = 10000
