@@ -71,7 +71,7 @@ class DualReferenceFR(object):
 
         self.embedding = self.net_forward(self.image_batch)
         self.id_embedding = self.get_id_embeddings(self.embedding)
-        self.id_loss = self.get_triplet_loss(self.id_embedding)
+        self.id_loss = self.get_triplet_loss_v2(self.id_embedding)
         self.total_loss = tf.add_n([self.id_loss], tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
         self.summary_op, self.average_op = self.build_summary()
         with tf.control_dependencies([self.average_op]):
@@ -113,6 +113,36 @@ class DualReferenceFR(object):
         basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
         loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
         return loss
+
+    def get_triplet_loss_v2(self,embeddings):
+        with tf.name_scope('loss_012'):
+            anchor = embeddings[0:self.batch_size:3][:]
+            positive = embeddings[1:self.batch_size:3][:]
+            negative = embeddings[2:self.batch_size:3][:]
+            pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
+            neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+
+            with tf.name_scope('distances'):
+                tf.summary.histogram('positive_012', pos_dist)
+                tf.summary.histogram('negative_012', neg_dist)
+
+            basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
+            loss_012 = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+
+        with tf.name_scope('loss_102'):
+            anchor = embeddings[1:self.batch_size:3][:]
+            positive = embeddings[0:self.batch_size:3][:]
+            negative = embeddings[2:self.batch_size:3][:]
+            pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
+            neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+
+            with tf.name_scope('distances'):
+                tf.summary.histogram('positive_102', pos_dist)
+                tf.summary.histogram('negative_102', neg_dist)
+
+            basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), self.delta)
+            loss_102 = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+        return loss_012+loss_102
 
     def build_summary(self):
         with tf.name_scope('affinity'):
