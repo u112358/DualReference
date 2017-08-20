@@ -19,7 +19,7 @@ class DualReferenceFR(object):
         self.val_dir = '/scratch/BingZhang/lfw/'
         self.val_list = './data/val_list.txt'
         # model directory
-        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQDL-Model'
+        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQDL0.1lr-Model'
         # image size
         self.image_height = 250
         self.image_width = 250
