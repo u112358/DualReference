@@ -19,15 +19,16 @@ class DualReferenceFR(object):
         self.val_dir = '/scratch/BingZhang/lfw/'
         self.val_list = './data/val_list.txt'
         # model directory
-        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQDL0.1lr-Model'
+        self.log_dir = '/scratch/BingZhang/logs_all_in_one/drfr'
+        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQDL0.006lrbatch90-Model'
         # image size
         self.image_height = 250
         self.image_width = 250
         self.image_channel = 3
         # net parameters
         self.step = 0
-        self.learning_rate = 0.1
-        self.batch_size = 30  # must be a multiple of 3
+        self.learning_rate = 0.006
+        self.batch_size = 90  # must be a multiple of 3
         self.feature_dim = 1024
         self.embedding_size = 128
         self.max_epoch = 10000
@@ -187,8 +188,11 @@ class DualReferenceFR(object):
         CACD = FileReader(self.data_dir, self.data_info, val_data_dir=self.val_dir, val_list=self.val_list,
                           reproducible=True, contain_val=True)
         summary_writer = tf.summary.FileWriter(
-            os.path.join('/scratch/BingZhang/logs_all_in_one/drfr', datetime.now().isoformat()), sess.graph)
-        saver = tf.train.Saver()
+            os.path.join(self.log_dir, datetime.now().isoformat()), sess.graph)
+        var = tf.trainable_variables()
+        var = [v for v in var if str(v).__contains__('Inception')]
+        saver = tf.train.Saver(var)
+        saver.restore(sess, '/scratch/BingZhang/facenet4drfr/model/20170512-110547/model-20170512-110547.ckpt-250000')
         aff_val = np.zeros((self.val_size,self.val_size))
         for triplet_selection in range(self.max_epoch):
             # select some examples to forward propagation
