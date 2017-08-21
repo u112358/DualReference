@@ -71,7 +71,7 @@ class DualReferenceFR(object):
             images = []
             for file_path in tf.unstack(file_paths):
                 file_content = tf.read_file(file_path)
-                image = tf.image.decode_jpeg(file_content)
+                image = tf.image.decode_png(file_content)
                 image.set_shape((self.image_height, self.image_width, self.image_channel))
                 images.append(tf.image.per_image_standardization(image))
             images_and_labels.append([images, labels])
