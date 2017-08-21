@@ -97,6 +97,24 @@ class FileReader():
                 labels.append(i)
         return np.asarray(paths), np.asarray(labels)
 
+    def select_age_path(self,nof_age,nof_images):
+        paths = []
+        labels = []
+        ages_selected = random.sample(range(14,63), nof_age)
+        for i in ages_selected:
+            images_indices = np.where(self.age == i)[0]
+            if len(images_indices) >= nof_images:
+                images_selected = random.sample(list(images_indices), nof_images)
+            else:
+                images_selected = images_indices
+            for image in images_selected:
+                try:
+                    paths.append(os.path.join(self.prefix, self.path[image][0].encode('utf-8')))
+                except:
+                    paths.append(os.path.join(self.prefix, self.path[image][0]))
+                labels.append(i)
+        return np.asarray(paths), np.asarray(labels)
+
     # def select_identity(self, nof_person, nof_images):
     #     images_and_labels = []
     #     # ids_selected \in [0,1999]

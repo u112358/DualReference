@@ -10,7 +10,9 @@ class MyTestCase(unittest.TestCase):
 
         val_path = CACD.get_val(144)
         print(val_path)
-
+        for i in range(10000):
+            path,label = CACD.select_age_path(20,20)
+            print(path,label)
 
 if __name__ == '__main__':
     unittest.main()
