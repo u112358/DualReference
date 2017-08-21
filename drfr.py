@@ -28,7 +28,7 @@ class DualReferenceFR(object):
         # net parameters
         self.step = 0
         self.learning_rate = 0.006
-        self.batch_size = 90  # must be a multiple of 3
+        self.batch_size = 30  # must be a multiple of 3
         self.feature_dim = 1024
         self.embedding_size = 128
         self.max_epoch = 10000

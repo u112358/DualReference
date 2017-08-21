@@ -20,7 +20,7 @@ class DualReferenceFR(object):
         self.val_list = './data/val_list.txt'
         # model directory
         self.log_dir = '/scratch/BingZhang/logs_all_in_one/drfr'
-        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQDL0.006lrbatch90-Model'
+        self.model_dir = '/scratch/BingZhang/models_all_in_one/DRFRQDL0.006lrbatch30-Model'
         # image size
         self.image_height = 250
         self.image_width = 250
@@ -28,7 +28,7 @@ class DualReferenceFR(object):
         # net parameters
         self.step = 0
         self.learning_rate = 0.006
-        self.batch_size = 90  # must be a multiple of 3
+        self.batch_size = 30  # must be a multiple of 3
         self.feature_dim = 1024
         self.embedding_size = 128
         self.max_epoch = 10000
