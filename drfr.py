@@ -1,6 +1,6 @@
 from __future__ import division
 
-from util.net import *
+from util.inception_resnet_v1 import *
 from tensorflow.python.ops import data_flow_ops
 from util.file_reader import *
 from util.progress import *
