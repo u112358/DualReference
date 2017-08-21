@@ -14,7 +14,7 @@ class DualReferenceFR(object):
         # self.data_info = '/home/bingzhang/Documents/Dataset/CACD/celenew.mat'
         # self.val_dir = '/home/bingzhang/Documents/Dataset/ZID/LFW/lfw'
 
-        self.data_dir = '/scratch/BingZhang/dataset/CACD2000'
+        self.data_dir = '/scratch/BingZhang/dataset/CACD2000_Cropped'
         self.data_info = '/scratch/BingZhang/dataset/CACD2000/celenew2.mat'
         self.val_dir = '/scratch/BingZhang/lfw/'
         self.val_list = './data/val_list.txt'
