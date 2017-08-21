@@ -91,9 +91,9 @@ class FileReader():
                 images_selected = images_indices
             for image in images_selected:
                 try:
-                    paths.append(os.path.join(self.prefix, self.path[image][0].encode('utf-8')))
+                    paths.append(os.path.join(self.prefix, self.path[image][0].encode('utf-8').replace('jpg','png')))
                 except:
-                    paths.append(os.path.join(self.prefix, self.path[image][0]))
+                    paths.append(os.path.join(self.prefix, self.path[image][0].replace('jpg','png')))
                 labels.append(i)
         return np.asarray(paths), np.asarray(labels)
 
@@ -109,9 +109,9 @@ class FileReader():
                 images_selected = images_indices
             for image in images_selected:
                 try:
-                    paths.append(os.path.join(self.prefix, self.path[image][0].encode('utf-8')))
+                    paths.append(os.path.join(self.prefix, self.path[image][0].encode('utf-8').replace('jpg','png')))
                 except:
-                    paths.append(os.path.join(self.prefix, self.path[image][0]))
+                    paths.append(os.path.join(self.prefix, self.path[image][0].replace('jpg','png')))
                 labels.append(i)
         return np.asarray(paths), np.asarray(labels)
 
