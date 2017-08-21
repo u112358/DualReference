@@ -6,8 +6,8 @@ CACD = FileReader(data_dir='/scratch/BingZhang/dataset/CACD2000_Cropped',
                   contain_val=False, val_list='./data/val_list.txt')
 for i in range(CACD.total_images):
     try:
-        path_t = os.path.join(CACD.prefix, CACD.path[i].encode('utf-8'))
+        path_t = os.path.join(CACD.prefix, CACD.path[i][0].encode('utf-8'))
     except:
-        path_t = os.path.join(CACD.prefix, CACD.path[i])
+        path_t = os.path.join(CACD.prefix, CACD.path[i][0])
     if not os.path.isfile(path_t):
-        print(CACD.path[i])
+        print(CACD.path[i][0])
