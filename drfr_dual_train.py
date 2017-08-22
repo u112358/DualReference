@@ -242,7 +242,7 @@ class DualReferenceFR(object):
             # ID Step
             # select some examples to forward propagation
             paths, labels = CACD.select_identity_path(self.nof_sampled_id, self.nof_images_per_id)
-            nof_examples = self.nof_sampled_id * self.nof_images_per_id
+            nof_examples = len(paths)
             path_array = np.reshape(paths, (-1, 3))
             label_array = np.reshape(np.arange(nof_examples), (-1, 3))
             embeddings_array = np.zeros(shape=(nof_examples, self.embedding_size))
@@ -299,7 +299,7 @@ class DualReferenceFR(object):
                     summary_writer.add_summary(_sum, self.step)
                 else:
                     loss, _ = sess.run([self.id_loss, self.id_opt], feed_dict={self.batch_size_placeholder: batch_size})
-                progress(i + 1, nof_batches, str(triplet_selection) + 'th Epoch',
+                progress(i + 1, nof_batches, str(triplet_selection) + 'th ID Epoch',
                          'Batches loss:' + str(loss))  # a command progress bar to watch training progress
                 self.step += 1
                 # save model
@@ -310,7 +310,7 @@ class DualReferenceFR(object):
                 # AGE Step
                 # select some examples to forward propagation
                 paths, labels = CACD.select_age_path(self.nof_sampled_age, self.nof_images_per_age)
-                nof_examples = self.nof_sampled_age * self.nof_images_per_age
+                nof_examples = len(paths)
                 path_array = np.reshape(paths, (-1, 3))
                 label_array = np.reshape(np.arange(nof_examples), (-1, 3))
                 embeddings_array = np.zeros(shape=(nof_examples, self.embedding_size))
@@ -369,7 +369,7 @@ class DualReferenceFR(object):
                     else:
                         loss, _ = sess.run([self.age_loss, self.age_opt],
                                            feed_dict={self.batch_size_placeholder: batch_size})
-                    progress(i + 1, nof_batches, str(triplet_selection) + 'th Epoch',
+                    progress(i + 1, nof_batches, str(triplet_selection) + 'th AGE Epoch',
                              'Batches loss:' + str(loss))  # a command progress bar to watch training progress
                     self.step += 1
                     # save model
