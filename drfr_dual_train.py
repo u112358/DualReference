@@ -16,7 +16,7 @@ class DualReferenceFR(object):
 
         self.data_dir = '/scratch/BingZhang/dataset/CACD2000_Cropped'
         self.data_info = '/scratch/BingZhang/dataset/CACD2000/celenew2.mat'
-        self.val_dir = '/scratch/BingZhang/lfw/'
+        self.val_dir = '/scratch/BingZhang/lfw__mtcnnpy_160/'
         self.val_list = './data/val_list.txt'
         # model directory
         self.log_dir = '/scratch/BingZhang/logs_all_in_one/drfr_dual_train'
@@ -306,7 +306,7 @@ class DualReferenceFR(object):
                 if self.step % 200000 == 0:
                     saver.save(sess, self.model_dir, global_step=self.step)
 
-            for _ in range(4):
+            for inner_iter in range(4):
                 # AGE Step
                 # select some examples to forward propagation
                 paths, labels = CACD.select_age_path(self.nof_sampled_age, self.nof_images_per_age)
@@ -369,7 +369,7 @@ class DualReferenceFR(object):
                     else:
                         loss, _ = sess.run([self.age_loss, self.age_opt],
                                            feed_dict={self.batch_size_placeholder: batch_size})
-                    progress(i + 1, nof_batches, str(triplet_selection) + 'th AGE Epoch',
+                    progress(i + 1, nof_batches, str(triplet_selection) + 'th AGE Epoch' +str(inner_iter),
                              'Batches loss:' + str(loss))  # a command progress bar to watch training progress
                     self.step += 1
                     # save model
