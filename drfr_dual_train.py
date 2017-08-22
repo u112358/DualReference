@@ -16,7 +16,7 @@ class DualReferenceFR(object):
 
         self.data_dir = '/scratch/BingZhang/dataset/CACD2000_Cropped'
         self.data_info = '/scratch/BingZhang/dataset/CACD2000/celenew2.mat'
-        self.val_dir = '/scratch/BingZhang/lfw__mtcnnpy_160/'
+        self.val_dir = '/scratch/BingZhang/lfw_250/'
         self.val_list = './data/val_list.txt'
         # model directory
         self.log_dir = '/scratch/BingZhang/logs_all_in_one/drfr_dual_train'
