@@ -199,7 +199,8 @@ class DualReferenceFR(object):
         var = tf.get_collection(tf.GraphKeys.SUMMARIES)
         age_sum = [v for v in var if str(v).__contains__('age')]
         id_sum = [v for v in var if str(v).__contains__('id')]
-        return tf.summary.merge(age_sum),tf.summary.merge(id_sum), average_op
+        others = [v for v in var if not str(v).__contains__('age') and not str(v).__contains__('id')]
+        return tf.summary.merge([age_sum,others]),tf.summary.merge([id_sum,others]), average_op
 
     # def test_module(self):
     #     CACD = FileReader(self.data_dir,self.data_info,reproducible=True,contain_val=False)
